@@ -156,8 +156,9 @@ export default function VariantPicker({
           {loading ? "Adding..." : "Add to cart"}
         </button>
       ) : (
-        <div className="flex items-center gap-4">
-          <div className="flex items-center rounded border border-line">
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex w-fit items-center rounded border border-line">
             <button
               onClick={() => changeQuantity(inCart - 1)}
               disabled={loading}
@@ -176,8 +177,10 @@ export default function VariantPicker({
               <Plus size={16} />
             </button>
           </div>
-          <span className="text-sm text-muted">in your cart</span>
-          <Link href="/cart" className="text-sm underline">
+          <Link
+            href="/cart"
+            className="rounded border border-accent px-5 py-3 text-center text-sm font-medium text-accent hover:bg-accent hover:text-accent-contrast sm:py-2.5"
+          >
             View cart
           </Link>
         </div>
