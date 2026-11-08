@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
   const selected = variants.find((v) => v.id === selectedId) ?? variants[0];
 
   if (!selected) {
-    return <p className="text-gray-600">Currently unavailable.</p>;
+    return <p className="text-muted">Currently unavailable.</p>;
   }
 
   const colors = Array.from(
@@ -79,7 +79,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
       <div className="flex items-baseline gap-3">
         <span className="text-2xl font-bold">{formatNaira(selected.price)}</span>
         {selected.compare_at_price && (
-          <span className="text-gray-500 line-through">
+          <span className="text-muted line-through">
             {formatNaira(selected.compare_at_price)}
           </span>
         )}
@@ -96,7 +96,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
                   setSelectedId(variants.find((v) => v.color === color)!.id)
                 }
                 className={`rounded border px-3 py-1 text-sm ${
-                  selected.color === color ? "border-black bg-black text-white" : ""
+                  selected.color === color ? "border-accent bg-accent text-accent-contrast" : ""
                 }`}
               >
                 {color}
@@ -115,7 +115,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
               onClick={() => setSelectedId(v.id)}
               disabled={v.stock === 0}
               className={`rounded border px-3 py-1 text-sm disabled:opacity-40 ${
-                selected.id === v.id ? "border-black bg-black text-white" : ""
+                selected.id === v.id ? "border-accent bg-accent text-accent-contrast" : ""
               }`}
             >
               {v.size}
@@ -124,7 +124,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
         </div>
       </div>
 
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-muted">
         {selected.stock === 0
           ? "Out of stock"
           : selected.stock <= 5
@@ -135,7 +135,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
       <button
         onClick={addToCart}
         disabled={loading || selected.stock === 0}
-        className="rounded bg-black p-3 text-white disabled:opacity-50"
+        className="rounded bg-accent p-3 font-medium text-accent-contrast disabled:opacity-50"
       >
         {loading ? "Adding..." : "Add to cart"}
       </button>

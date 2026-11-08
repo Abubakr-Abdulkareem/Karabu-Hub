@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -64,11 +64,11 @@ export default function RegisterPage() {
           minLength={6}
           className="rounded border p-2"
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-400">{error}</p>}
         <button
           type="submit"
           disabled={loading}
-          className="rounded bg-black p-2 text-white disabled:opacity-50"
+          className="rounded bg-accent p-2 font-medium text-accent-contrast disabled:opacity-50"
         >
           {loading ? "Creating..." : "Sign up"}
         </button>
