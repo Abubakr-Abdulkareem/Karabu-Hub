@@ -50,7 +50,7 @@ export default async function Home() {
                   alt={product.name}
                   width={600}
                   height={800}
-                  className="mb-3 aspect-[3/4] w-full rounded object-cover"
+                  className="mb-3 aspect-3/4 w-full rounded object-cover"
                 />
               )}
               <h2 className="font-medium">{product.name}</h2>
