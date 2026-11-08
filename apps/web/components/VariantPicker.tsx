@@ -70,6 +70,7 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
           .insert({ user_id: user.id, variant_id: selected.id, quantity: 1 });
 
     setMessage(error ? error.message : "Added to cart.");
+    if (!error) router.refresh();
     setLoading(false);
   }
 
