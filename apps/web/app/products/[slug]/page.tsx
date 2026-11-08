@@ -38,6 +38,25 @@ export default async function ProductPage({
     (a, b) => a.position - b.position
   );
 
+    const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const cartQuantities: Record<string, number> = {};
+  if (user) {
+    const { data: cartRows } = await supabase
+      .from("cart_items")
+      .select("variant_id, quantity")
+      .eq("user_id", user.id)
+      .in(
+        "variant_id",
+        product.product_variants.map((v) => v.id)
+      );
+    (cartRows ?? []).forEach((row) => {
+      cartQuantities[row.variant_id] = row.quantity;
+    });
+  }
+
   return (
     <main className="mx-auto max-w-5xl p-6">
       <Link href="/" className="mb-4 inline-block text-sm underline">
@@ -80,7 +99,10 @@ export default async function ProductPage({
             <p className="text-sm text-gray-600">By {product.brand}</p>
           )}
           {product.description && <p>{product.description}</p>}
-          <VariantPicker variants={product.product_variants} />
+          <VariantPicker
+            variants={product.product_variants}
+            cartQuantities={cartQuantities}
+          />
         </div>
       </div>
     </main>
