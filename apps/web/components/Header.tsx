@@ -45,8 +45,6 @@ export default async function Header() {
 
         <nav className="hidden gap-6 text-sm text-muted md:flex">
           <Link href="/#shop" className="hover:text-foreground">Shop</Link>
-          <Link href="/?gender=men#shop" className="hover:text-foreground">Men</Link>
-          <Link href="/?gender=women#shop" className="hover:text-foreground">Women</Link>
           {user && (
             <Link href="/orders" className="hover:text-foreground">My orders</Link>
           )}
