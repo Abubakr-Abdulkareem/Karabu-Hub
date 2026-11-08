@@ -1,7 +1,9 @@
 ﻿"use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Minus, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatNaira } from "@/lib/format";
 
@@ -14,9 +16,16 @@ export type Variant = {
   stock: number;
 };
 
-export default function VariantPicker({ variants }: { variants: Variant[] }) {
+export default function VariantPicker({
+  variants,
+  cartQuantities,
+}: {
+  variants: Variant[];
+  cartQuantities: Record<string, number>;
+}) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(variants[0]?.id);
+  const [quantities, setQuantities] = useState(cartQuantities);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -26,12 +35,19 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
     return <p className="text-muted">Currently unavailable.</p>;
   }
 
+  const inCart = quantities[selected.id] ?? 0;
+
   const colors = Array.from(
     new Set(variants.map((v) => v.color).filter((c): c is string => c !== null))
   );
   const sameColor = variants.filter((v) => v.color === selected.color);
 
-  async function addToCart() {
+  async function changeQuantity(next: number) {
+    if (next > selected.stock) {
+      setMessage(`Only ${selected.stock} left in stock.`);
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
@@ -41,36 +57,31 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      setLoading(false);
       router.push("/login");
       return;
     }
 
-    const { data: existing } = await supabase
-      .from("cart_items")
-      .select("id, quantity")
-      .eq("user_id", user.id)
-      .eq("variant_id", selected.id)
-      .maybeSingle();
+    const { error } =
+      next === 0
+        ? await supabase
+            .from("cart_items")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("variant_id", selected.id)
+        : await supabase
+            .from("cart_items")
+            .upsert(
+              { user_id: user.id, variant_id: selected.id, quantity: next },
+              { onConflict: "user_id,variant_id" }
+            );
 
-    const newQuantity = (existing?.quantity ?? 0) + 1;
-
-    if (newQuantity > selected.stock) {
-      setMessage(`Only ${selected.stock} left in stock.`);
-      setLoading(false);
-      return;
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setQuantities((prev) => ({ ...prev, [selected.id]: next }));
+      router.refresh();
     }
-
-    const { error } = existing
-      ? await supabase
-          .from("cart_items")
-          .update({ quantity: newQuantity })
-          .eq("id", existing.id)
-      : await supabase
-          .from("cart_items")
-          .insert({ user_id: user.id, variant_id: selected.id, quantity: 1 });
-
-    setMessage(error ? error.message : "Added to cart.");
-    if (!error) router.refresh();
     setLoading(false);
   }
 
@@ -96,7 +107,9 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
                   setSelectedId(variants.find((v) => v.color === color)!.id)
                 }
                 className={`rounded border px-3 py-1 text-sm ${
-                  selected.color === color ? "border-accent bg-accent text-accent-contrast" : ""
+                  selected.color === color
+                    ? "border-accent bg-accent text-accent-contrast"
+                    : ""
                 }`}
               >
                 {color}
@@ -115,7 +128,9 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
               onClick={() => setSelectedId(v.id)}
               disabled={v.stock === 0}
               className={`rounded border px-3 py-1 text-sm disabled:opacity-40 ${
-                selected.id === v.id ? "border-accent bg-accent text-accent-contrast" : ""
+                selected.id === v.id
+                  ? "border-accent bg-accent text-accent-contrast"
+                  : ""
               }`}
             >
               {v.size}
@@ -132,15 +147,43 @@ export default function VariantPicker({ variants }: { variants: Variant[] }) {
           : "In stock"}
       </p>
 
-      <button
-        onClick={addToCart}
-        disabled={loading || selected.stock === 0}
-        className="rounded bg-accent p-3 font-medium text-accent-contrast disabled:opacity-50"
-      >
-        {loading ? "Adding..." : "Add to cart"}
-      </button>
+      {inCart === 0 ? (
+        <button
+          onClick={() => changeQuantity(1)}
+          disabled={loading || selected.stock === 0}
+          className="rounded bg-accent p-3 font-medium text-accent-contrast disabled:opacity-50"
+        >
+          {loading ? "Adding..." : "Add to cart"}
+        </button>
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="flex items-center rounded border border-line">
+            <button
+              onClick={() => changeQuantity(inCart - 1)}
+              disabled={loading}
+              aria-label="Decrease quantity"
+              className="p-3 disabled:opacity-40"
+            >
+              <Minus size={16} />
+            </button>
+            <span className="w-10 text-center">{inCart}</span>
+            <button
+              onClick={() => changeQuantity(inCart + 1)}
+              disabled={loading || inCart >= selected.stock}
+              aria-label="Increase quantity"
+              className="p-3 disabled:opacity-40"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+          <span className="text-sm text-muted">in your cart</span>
+          <Link href="/cart" className="text-sm underline">
+            View cart
+          </Link>
+        </div>
+      )}
 
-      {message && <p className="text-sm">{message}</p>}
+      {message && <p className="text-sm text-red-400">{message}</p>}
     </div>
   );
 }
