@@ -1,5 +1,7 @@
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { formatNaira } from "@/lib/format";
 
 type Product = {
   id: string;
@@ -8,13 +10,6 @@ type Product = {
   product_variants: { price: number; compare_at_price: number | null }[];
   product_images: { url: string; position: number }[];
 };
-
-const formatNaira = (amount: number) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(amount);
 
 export default async function Home() {
   const supabase = await createClient();
@@ -43,7 +38,11 @@ export default async function Home() {
           const lowest = prices.length ? Math.min(...prices) : null;
 
           return (
-            <div key={product.id} className="rounded-lg border p-3">
+            <Link
+              key={product.id}
+              href={`/products/${product.slug}`}
+              className="rounded-lg border p-3 hover:shadow"
+            >
               {image && (
                 <Image
                   src={image.url}
@@ -57,7 +56,7 @@ export default async function Home() {
               {lowest !== null && (
                 <p className="text-sm text-gray-600">From {formatNaira(lowest)}</p>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>
