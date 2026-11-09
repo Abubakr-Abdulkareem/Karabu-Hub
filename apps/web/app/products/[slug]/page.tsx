@@ -1,8 +1,8 @@
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import VariantPicker, { type Variant } from "@/components/VariantPicker";
+import BackButton from "@/components/BackButton";
 
 type ProductDetail = {
   id: string;
@@ -59,9 +59,7 @@ export default async function ProductPage({
 
   return (
     <main className="mx-auto max-w-5xl p-6">
-      <Link href="/" className="mb-4 inline-block text-sm underline">
-        Back to shop
-      </Link>
+      <BackButton fallbackHref="/#shop" />
 
       <div className="grid gap-8 md:grid-cols-2">
         <div className="flex flex-col gap-3">

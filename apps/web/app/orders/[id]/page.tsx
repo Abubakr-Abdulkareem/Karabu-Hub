@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatNaira } from "@/lib/format";
 import OrderStatusBadge, { statusLabels } from "@/components/OrderStatusBadge";
+import BackButton from "@/components/BackButton";
 
 type OrderDetail = {
   id: string;
@@ -58,9 +58,7 @@ export default async function OrderDetailPage({
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
-      <Link href="/orders" className="mb-4 inline-block text-sm text-muted hover:text-foreground">
-        ← Back to my orders
-      </Link>
+      <BackButton fallbackHref="/orders" />
 
       <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
