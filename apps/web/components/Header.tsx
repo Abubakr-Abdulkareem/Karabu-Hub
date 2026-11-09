@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Bell, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import LogoutButton from "./LogoutButton";
+import UserMenu from "./UserMenu";
+import MobileNav from "./MobileNav";
 
 function Badge({ count }: { count: number }) {
   return (
@@ -17,10 +18,10 @@ export default async function Header() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let name: string | null = null;
+  let name = "";
+  let isAdmin = false;
   let cartCount = 0;
   let unreadCount = 0;
-  let isAdmin = false;
 
   if (user) {
     const [profileRes, cartRes, notifRes] = await Promise.all([
@@ -32,58 +33,66 @@ export default async function Header() {
         .eq("user_id", user.id)
         .eq("is_read", false),
     ]);
-    name = profileRes.data?.full_name ?? user.email ?? null;
+    name = profileRes.data?.full_name ?? "";
     isAdmin = profileRes.data?.is_admin ?? false;
     cartCount = (cartRes.data ?? []).reduce((sum, item) => sum + item.quantity, 0);
     unreadCount = notifRes.count ?? 0;
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="font-display text-2xl uppercase tracking-wide">
-          Karabu<span className="text-accent">Hub</span>
-        </Link>
+    <>
+      <header className="sticky top-0 z-40 border-b border-line bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <Link href="/" className="font-display text-2xl uppercase tracking-wide">
+            Karabu<span className="text-accent">Hub</span>
+          </Link>
 
-        <nav className="hidden gap-6 text-sm text-muted md:flex">
-          <Link href="/#shop" className="hover:text-foreground">Shop</Link>
-          {user && (
-            <Link href="/orders" className="hover:text-foreground">My orders</Link>
-          )}
-        </nav>
+          <nav className="hidden gap-6 text-sm text-muted md:flex">
+            <Link href="/#shop" className="hover:text-foreground">Shop</Link>
+            <Link href="/categories" className="hover:text-foreground">Categories</Link>
+          </nav>
 
-        <div className="flex items-center gap-5 text-sm">
-          {user ? (
-            <>
-              {isAdmin && (
-                <Link href="/admin" className="font-medium text-accent hover:underline">
-                  Admin
+          <div className="flex items-center gap-5 text-sm">
+            {user ? (
+              <>
+                <Link
+                  href="/notifications"
+                  aria-label="Notifications"
+                  className="relative hidden md:block"
+                >
+                  <Bell size={20} />
+                  {unreadCount > 0 && <Badge count={unreadCount} />}
                 </Link>
-              )}
-              <Link href="/notifications" aria-label="Notifications" className="relative">
-                <Bell size={20} />
-                {unreadCount > 0 && <Badge count={unreadCount} />}
-              </Link>
-              <Link href="/cart" aria-label="Cart" className="relative">
-                <ShoppingBag size={20} />
-                {cartCount > 0 && <Badge count={cartCount} />}
-              </Link>
-              <span className="hidden text-muted md:inline">Hi, {name}</span>
-              <LogoutButton />
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="text-muted hover:text-foreground">Log in</Link>
-              <Link
-                href="/register"
-                className="rounded bg-accent px-3 py-1.5 font-medium text-accent-contrast"
-              >
-                Sign up
-              </Link>
-            </>
-          )}
+                <Link href="/cart" aria-label="Cart" className="relative hidden md:block">
+                  <ShoppingBag size={20} />
+                  {cartCount > 0 && <Badge count={cartCount} />}
+                </Link>
+                <UserMenu
+                  name={name}
+                  email={user.email ?? ""}
+                  isAdmin={isAdmin}
+                  cartCount={cartCount}
+                  unreadCount={unreadCount}
+                />
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="text-muted hover:text-foreground">
+                  Log in
+                </Link>
+                <Link
+                  href="/register"
+                  className="rounded bg-accent px-3 py-1.5 font-medium text-accent-contrast"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      <MobileNav loggedIn={!!user} cartCount={cartCount} unreadCount={unreadCount} />
+    </>
   );
 }

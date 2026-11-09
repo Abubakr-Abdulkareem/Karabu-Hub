@@ -18,7 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${oswald.variable} flex min-h-screen flex-col bg-background font-sans text-foreground antialiased`}
+        className={`${geistSans.variable} ${oswald.variable} flex min-h-screen flex-col pb-16 md:pb-0 bg-background font-sans text-foreground antialiased`}
       >
         <Header />
         <div className="flex-1">{children}</div>
