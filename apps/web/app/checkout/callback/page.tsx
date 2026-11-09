@@ -58,7 +58,7 @@ export default async function CheckoutCallbackPage({
           <h1 className="font-display text-4xl uppercase">Payment successful</h1>
           <p className="mt-4 text-muted">
             Thank you! We received {formatNaira(Number(order.total))} and your order
-            is being prepared. We'll notify you when it's on its way.
+            is being prepared. We will notify you when it is on its way.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
@@ -79,8 +79,8 @@ export default async function CheckoutCallbackPage({
         <>
           <h1 className="font-display text-4xl uppercase">Payment not completed</h1>
           <p className="mt-4 text-muted">
-            We couldn't confirm your payment, so you haven't been charged for this
-            order. Your cart is still saved.
+            We could not confirm your payment yet. If you were charged, please
+            contact us. Otherwise your cart is still saved and you can try again.
           </p>
           <Link
             href="/cart"
