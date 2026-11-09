@@ -20,10 +20,11 @@ export default async function Header() {
   let name: string | null = null;
   let cartCount = 0;
   let unreadCount = 0;
+  let isAdmin = false;
 
   if (user) {
     const [profileRes, cartRes, notifRes] = await Promise.all([
-      supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, is_admin").eq("id", user.id).single(),
       supabase.from("cart_items").select("quantity").eq("user_id", user.id),
       supabase
         .from("notifications")
@@ -32,6 +33,7 @@ export default async function Header() {
         .eq("is_read", false),
     ]);
     name = profileRes.data?.full_name ?? user.email ?? null;
+    isAdmin = profileRes.data?.is_admin ?? false;
     cartCount = (cartRes.data ?? []).reduce((sum, item) => sum + item.quantity, 0);
     unreadCount = notifRes.count ?? 0;
   }
@@ -53,6 +55,11 @@ export default async function Header() {
         <div className="flex items-center gap-5 text-sm">
           {user ? (
             <>
+              {isAdmin && (
+                <Link href="/admin" className="font-medium text-accent hover:underline">
+                  Admin
+                </Link>
+              )}
               <Link href="/notifications" aria-label="Notifications" className="relative">
                 <Bell size={20} />
                 {unreadCount > 0 && <Badge count={unreadCount} />}
