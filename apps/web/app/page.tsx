@@ -1,8 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Truck, ShieldCheck, PackageCheck, Headphones } from "lucide-react";
+import {
+  Headphones,
+  MessageCircle,
+  PackageCheck,
+  Search,
+  ShieldCheck,
+  Truck,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { formatNaira } from "@/lib/format";
+import ProductCard, {
+  biggestDiscount,
+  lowestPrice,
+  type CardProduct,
+} from "@/components/ProductCard";
+import ProductRow from "@/components/ProductRow";
 
 type Category = {
   id: string;
@@ -11,18 +23,9 @@ type Category = {
   slug: string;
 };
 
-type Product = {
-  id: string;
-  name: string;
-  slug: string;
+type Product = CardProduct & {
   created_at: string;
-  is_active: boolean;
-  product_variants: {
-    price: number;
-    compare_at_price: number | null;
-    color: string | null;
-  }[];
-  product_images: { url: string; position: number }[];
+  category_id: string | null;
 };
 
 type SearchParams = {
@@ -74,6 +77,9 @@ const benefits = [
   { icon: Headphones, title: "Support", text: "We are here to help" },
 ];
 
+const firstImage = (p: Product) =>
+  [...p.product_images].sort((a, b) => a.position - b.position)[0]?.url;
+
 export default async function Home({
   searchParams,
 }: {
@@ -115,7 +121,7 @@ export default async function Home({
   let query = supabase
     .from("products")
     .select(
-      `id, name, slug, created_at, is_active, ${variantJoin}(price, compare_at_price, color), product_images(url, position)`
+      `id, name, slug, created_at, is_active, category_id, ${variantJoin}(price, compare_at_price, color), product_images(url, position)`
     );
 
   if (categoryIds) query = query.in("category_id", categoryIds);
@@ -134,9 +140,6 @@ export default async function Home({
     );
   }
 
-  const lowestPrice = (p: Product) =>
-    Math.min(...p.product_variants.map((v) => v.price));
-
   const products = ((data ?? []) as unknown as Product[])
     .filter((p) => p.product_variants.length > 0)
     .sort((a, b) => {
@@ -144,6 +147,44 @@ export default async function Home({
       if (params.sort === "price_desc") return lowestPrice(b) - lowestPrice(a);
       return b.created_at.localeCompare(a.created_at);
     });
+
+  // Homepage sections only show when nobody is searching or filtering
+  const isFiltered = Boolean(
+    params.q || params.category || params.gender || hasMin || hasMax || params.sort
+  );
+  const visible = products.filter((p) => p.is_active);
+
+  const newArrivals = isFiltered || visible.length < 5 ? [] : visible.slice(0, 8);
+
+  const onSale = isFiltered
+    ? []
+    : visible
+        .filter((p) => biggestDiscount(p) > 0)
+        .sort((a, b) => biggestDiscount(b) - biggestDiscount(a))
+        .slice(0, 8);
+
+  const tiles = isFiltered
+    ? []
+    : (topCategories
+        .map((cat) => {
+          const ids = [
+            cat.id,
+            ...categories.filter((c) => c.parent_id === cat.id).map((c) => c.id),
+          ];
+          const inCategory = visible.filter(
+            (p) => p.category_id && ids.includes(p.category_id)
+          );
+          const image = inCategory.map(firstImage).find(Boolean);
+          return { name: cat.name, slug: cat.slug, count: inCategory.length, image };
+        })
+        .filter((t) => t.count > 0 && t.image) as {
+        name: string;
+        slug: string;
+        count: number;
+        image: string;
+      }[]);
+
+  const whatsappNumber = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "").replace(/\D/g, "");
 
   return (
     <main>
@@ -184,10 +225,43 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Shop by category */}
+      {tiles.length >= 2 && (
+        <section className="mx-auto max-w-6xl px-6 pt-12">
+          <h2 className="mb-5 font-display text-3xl uppercase">Shop by category</h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((tile) => (
+              <Link
+                key={tile.slug}
+                href={`/?category=${tile.slug}#shop`}
+                className="group cut-corner relative block overflow-hidden bg-surface-2"
+              >
+                <Image
+                  src={tile.image}
+                  alt={tile.name}
+                  width={600}
+                  height={750}
+                  className="aspect-4/5 w-full object-cover transition duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-background/90 to-transparent p-4">
+                  <p className="font-display text-xl uppercase">{tile.name}</p>
+                  <p className="text-xs text-muted">
+                    {tile.count} {tile.count === 1 ? "item" : "items"}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <ProductRow title="New arrivals" products={newArrivals} href="#shop" />
+      <ProductRow title="On sale" products={onSale} />
+
       {/* Shop */}
       <section id="shop" className="mx-auto max-w-6xl scroll-mt-20 px-6 py-12">
         <div className="mb-6 flex items-end justify-between">
-          <h2 className="font-display text-4xl uppercase">New collection</h2>
+          <h2 className="font-display text-4xl uppercase">All products</h2>
           <p className="text-sm text-muted">{products.length} items</p>
         </div>
 
@@ -291,76 +365,37 @@ export default async function Home({
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {products.map((product) => {
-              const image = [...product.product_images].sort(
-                (a, b) => a.position - b.position
-              )[0];
-              const colors = Array.from(
-                new Set(
-                  product.product_variants
-                    .map((v) => v.color)
-                    .filter((c): c is string => c !== null)
-                )
-              );
-              const onSale = product.product_variants.some(
-                (v) => v.compare_at_price && v.compare_at_price > v.price
-              );
-
-              return (
-                <Link
-                  key={product.id}
-                  href={`/products/${product.slug}`}
-                  className="group"
-                >
-                  <div className="cut-corner relative overflow-hidden bg-surface-2">
-                    {image && (
-                      <Image
-                        src={image.url}
-                        alt={product.name}
-                        width={600}
-                        height={800}
-                        className={`aspect-3/4 w-full object-cover transition duration-300 group-hover:scale-105 ${
-                          product.is_active ? "" : "opacity-50"
-                        }`}
-                      />
-                    )}
-                    {onSale && (
-                      <span className="absolute left-2 top-2 rounded bg-accent px-2 py-0.5 text-xs font-semibold text-accent-contrast">
-                        SALE
-                      </span>
-                    )}
-                    {!product.is_active && (
-                      <span className="absolute right-2 top-2 rounded bg-surface px-2 py-0.5 text-xs font-semibold text-muted">
-                        HIDDEN
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3">
-                    <h3 className="text-sm font-medium uppercase tracking-wide">
-                      {product.name}
-                    </h3>
-                    {colors.length > 0 && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        {colors.map((color) => (
-                          <span
-                            key={color}
-                            title={color}
-                            className="h-3 w-3 rounded-full border border-line"
-                            style={{ backgroundColor: color.toLowerCase() }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    <p className="mt-1 text-sm text-muted">
-                      From {formatNaira(lowestPrice(product))}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
           </div>
         )}
       </section>
+
+      {/* WhatsApp help (only shows when a number is set) */}
+      {whatsappNumber && !isFiltered && (
+        <section className="mx-auto max-w-6xl px-6 pb-4">
+          <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-line bg-surface p-6 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="font-display text-2xl uppercase">Need help choosing?</h2>
+              <p className="mt-1 text-sm text-muted">
+                Ask about sizes, availability or delivery. We reply on WhatsApp.
+              </p>
+            </div>
+            <a
+              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+                "Hello Karabu Hub, I need some help."
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-2 rounded bg-accent px-6 py-3 font-medium text-accent-contrast hover:bg-accent-strong"
+            >
+              <MessageCircle size={18} />
+              Chat on WhatsApp
+            </a>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
