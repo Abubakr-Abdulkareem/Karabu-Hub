@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatNaira } from "@/lib/format";
-import OrderStatusSelect from "@/components/OrderStatusSelect";
+import AdminOrderList, { type AdminOrderView } from "@/components/AdminOrderList";
 
 type AdminOrder = {
   id: string;
@@ -56,7 +56,16 @@ export default async function AdminOrdersPage({
     return <p className="text-red-400">Could not load orders: {error.message}</p>;
   }
 
-  const orders = (data ?? []) as unknown as AdminOrder[];
+  const orders: AdminOrderView[] = ((data ?? []) as unknown as AdminOrder[]).map((o) => ({
+    id: o.id,
+    status: o.status,
+    totalLabel: formatNaira(Number(o.total)),
+    dateLabel: formatDateTime(o.created_at),
+    recipient_name: o.recipient_name,
+    phone: o.phone,
+    address: `${o.street}, ${o.city}, ${o.state}`,
+    items: o.order_items,
+  }));
 
   return (
     <div>
@@ -82,51 +91,7 @@ export default async function AdminOrdersPage({
       {orders.length === 0 ? (
         <p className="py-10 text-center text-muted">No orders here yet.</p>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {orders.map((order) => (
-            <li
-              key={order.id}
-              className="grid gap-4 rounded-lg border border-line bg-surface p-4 md:grid-cols-[1fr_1fr_200px]"
-            >
-              <div>
-                <p className="font-medium">
-                  Order #{order.id.slice(0, 8).toUpperCase()}
-                </p>
-                <p className="text-sm text-muted">{formatDateTime(order.created_at)}</p>
-                <ul className="mt-3 flex flex-col gap-1 text-sm">
-                  {order.order_items.map((item) => (
-                    <li key={item.id}>
-                      {item.product_name} × {item.quantity}
-                      <span className="text-muted">
-                        {" "}
-                        {[item.color, item.size].filter(Boolean).join(" · ")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3 font-medium">{formatNaira(Number(order.total))}</p>
-              </div>
-
-              <div className="text-sm">
-                <p className="mb-1 text-xs uppercase tracking-wide text-muted">
-                  Deliver to
-                </p>
-                <p className="font-medium">{order.recipient_name}</p>
-                <a href={`tel:${order.phone}`} className="text-accent hover:underline">
-                  {order.phone}
-                </a>
-                <p className="mt-1 text-muted">
-                  {order.street}, {order.city}, {order.state}
-                </p>
-              </div>
-
-              <div>
-                <p className="mb-1 text-xs uppercase tracking-wide text-muted">Status</p>
-                <OrderStatusSelect orderId={order.id} status={order.status} />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <AdminOrderList orders={orders} />
       )}
     </div>
   );
