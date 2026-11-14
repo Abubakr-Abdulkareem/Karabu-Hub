@@ -16,6 +16,7 @@ type Product = {
   name: string;
   slug: string;
   created_at: string;
+  is_active: boolean;
   product_variants: {
     price: number;
     compare_at_price: number | null;
@@ -70,7 +71,7 @@ const benefits = [
   { icon: Truck, title: "Fast delivery", text: "Track your order live" },
   { icon: ShieldCheck, title: "Secure payment", text: "Pay safely with Paystack" },
   { icon: PackageCheck, title: "Quality picks", text: "Carefully selected items" },
-  { icon: Headphones, title: "Support", text: "We're here to help" },
+  { icon: Headphones, title: "Support", text: "We are here to help" },
 ];
 
 export default async function Home({
@@ -110,10 +111,11 @@ export default async function Home({
   const variantJoin =
     hasMin || hasMax ? "product_variants!inner" : "product_variants";
 
+  // Hidden products only come back for admins (the database blocks them for everyone else)
   let query = supabase
     .from("products")
     .select(
-      `id, name, slug, created_at, ${variantJoin}(price, compare_at_price, color), product_images(url, position)`
+      `id, name, slug, created_at, is_active, ${variantJoin}(price, compare_at_price, color), product_images(url, position)`
     );
 
   if (categoryIds) query = query.in("category_id", categoryIds);
@@ -146,7 +148,7 @@ export default async function Home({
   return (
     <main>
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-line bg-gradient-to-br from-[#16263a] via-background to-background">
+      <section className="relative overflow-hidden border-b border-line bg-linear-to-br from-[#16263a] via-background to-background">
         <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent/20 blur-3xl" />
         <div className="relative mx-auto max-w-6xl px-6 py-20 md:py-28">
           <p className="mb-4 text-xs tracking-[0.3em] text-accent">[ NEW COLLECTION ]</p>
@@ -317,12 +319,19 @@ export default async function Home({
                         alt={product.name}
                         width={600}
                         height={800}
-                        className="aspect-3/4 w-full object-cover transition duration-300 group-hover:scale-105"
+                        className={`aspect-3/4 w-full object-cover transition duration-300 group-hover:scale-105 ${
+                          product.is_active ? "" : "opacity-50"
+                        }`}
                       />
                     )}
                     {onSale && (
                       <span className="absolute left-2 top-2 rounded bg-accent px-2 py-0.5 text-xs font-semibold text-accent-contrast">
                         SALE
+                      </span>
+                    )}
+                    {!product.is_active && (
+                      <span className="absolute right-2 top-2 rounded bg-surface px-2 py-0.5 text-xs font-semibold text-muted">
+                        HIDDEN
                       </span>
                     )}
                   </div>
