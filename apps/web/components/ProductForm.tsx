@@ -63,6 +63,19 @@ type VariantRow = {
 const BUCKET = "product-images";
 const MAX_FILE_MB = 5;
 
+const SIZE_PRESETS: Record<string, { label: string; sizes: string[] }> = {
+  clothing: { label: "Clothing (XS to XXL)", sizes: ["XS", "S", "M", "L", "XL", "XXL"] },
+  shoes: {
+    label: "Shoes (EU 36 to 46)",
+    sizes: ["36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"],
+  },
+  waist: { label: "Trousers (waist 28 to 40)", sizes: ["28", "30", "32", "34", "36", "38", "40"] },
+  perfume: { label: "Perfume (ml)", sizes: ["30ml", "50ml", "100ml"] },
+  one: { label: "One size (no sizes)", sizes: ["One size"] },
+};
+
+const COMMON_COLORS = ["Black", "White", "Navy", "Grey", "Brown", "Beige", "Red", "Blue", "Green"];
+
 let keyCounter = 0;
 const nextKey = () => `k${++keyCounter}`;
 
@@ -80,8 +93,35 @@ const pathsFrom = (urls: string[]) =>
 
 const friendly = (error: { code?: string; message: string } | null) =>
   error?.code === "23505"
-    ? "That name or SKU is already used by another product. Please change it."
+    ? "That name is already used by another product. Please change it."
     : error?.message ?? "Something went wrong.";
+
+const toggle = (list: string[], value: string) =>
+  list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
+
+function ChipButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-sm ${
+        active
+          ? "border-accent bg-accent text-accent-contrast"
+          : "border-line text-muted hover:border-accent hover:text-foreground"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function ProductForm({
   categories,
@@ -112,6 +152,18 @@ export default function ProductForm({
   );
   const [removedImages, setRemovedImages] = useState<{ id: string; url: string }[]>([]);
 
+  // Quick add panel
+  const [sizePresetKey, setSizePresetKey] = useState("clothing");
+  const [sizeOptions, setSizeOptions] = useState<string[]>(SIZE_PRESETS.clothing.sizes);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [customSize, setCustomSize] = useState("");
+  const [colorOptions, setColorOptions] = useState<string[]>(COMMON_COLORS);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [customColor, setCustomColor] = useState("");
+  const [basePrice, setBasePrice] = useState("");
+  const [baseStock, setBaseStock] = useState("5");
+  const [genError, setGenError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,9 +176,89 @@ export default function ProductForm({
         .map((c) => ({ id: c.id, label: `— ${c.name}` })),
     ]);
 
+  function choosePreset(key: string) {
+    setSizePresetKey(key);
+    setSizeOptions(SIZE_PRESETS[key].sizes);
+    setSelectedSizes([]);
+  }
+
+  function addCustomSize() {
+    const value = customSize.trim();
+    if (!value) return;
+    const existing = sizeOptions.find((s) => s.toLowerCase() === value.toLowerCase());
+    const finalValue = existing ?? value;
+    if (!existing) setSizeOptions((prev) => [...prev, finalValue]);
+    setSelectedSizes((prev) => (prev.includes(finalValue) ? prev : [...prev, finalValue]));
+    setCustomSize("");
+  }
+
+  function addCustomColor() {
+    const raw = customColor.trim();
+    if (!raw) return;
+    const value = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const existing = colorOptions.find((c) => c.toLowerCase() === value.toLowerCase());
+    const finalValue = existing ?? value;
+    if (!existing) setColorOptions((prev) => [...prev, finalValue]);
+    setSelectedColors((prev) => (prev.includes(finalValue) ? prev : [...prev, finalValue]));
+    setCustomColor("");
+  }
+
+  function createOptions() {
+    setGenError(null);
+
+    if (selectedSizes.length === 0 && selectedColors.length === 0) {
+      return setGenError("Tap at least one size or one colour first.");
+    }
+    const price = Number(basePrice);
+    const stock = Number(baseStock.trim() === "" ? "0" : baseStock);
+    if (basePrice.trim() === "" || !Number.isFinite(price) || price < 0) {
+      return setGenError("Enter the price first.");
+    }
+    if (!Number.isInteger(stock) || stock < 0) {
+      return setGenError("Stock must be a whole number, 0 or more.");
+    }
+
+    const sizes = selectedSizes.length > 0 ? selectedSizes : [""];
+    const colors = selectedColors.length > 0 ? selectedColors : [""];
+
+    const exists = (size: string, color: string) =>
+      variants.some(
+        (v) =>
+          v.size.trim().toLowerCase() === size.toLowerCase() &&
+          v.color.trim().toLowerCase() === color.toLowerCase()
+      );
+
+    const created: VariantField[] = [];
+    for (const color of colors) {
+      for (const size of sizes) {
+        if (exists(size, color)) continue;
+        created.push({
+          key: nextKey(),
+          size,
+          color,
+          price: String(price),
+          compare_at_price: "",
+          stock: String(stock),
+          sku: "",
+        });
+      }
+    }
+
+    if (created.length === 0) {
+      return setGenError("Those options are already in the list below.");
+    }
+
+    const isBlank = (v: VariantField) =>
+      !v.id && !v.size.trim() && !v.color.trim() && v.price.trim() === "";
+
+    setVariants((prev) => [...prev.filter((v) => !isBlank(v)), ...created]);
+    setSelectedSizes([]);
+    setSelectedColors([]);
+  }
+
   function updateVariant(
     key: string,
-    field: "size" | "color" | "price" | "compare_at_price" | "stock" | "sku",
+    field: "size" | "color" | "price" | "compare_at_price" | "stock",
     value: string
   ) {
     setVariants((prev) => prev.map((v) => (v.key === key ? { ...v, [field]: value } : v)));
@@ -198,7 +330,7 @@ export default function ProductForm({
         return setError("Stock must be a whole number, 0 or more.");
       }
       if (compare !== null && (!Number.isFinite(compare) || compare < 0)) {
-        return setError("Old price must be a valid number.");
+        return setError("Original price must be a valid number.");
       }
 
       parsed.push({
@@ -252,7 +384,6 @@ export default function ProductForm({
       productId = data.id as string;
     }
 
-    // Options (sizes / colours)
     if (removedVariantIds.length > 0) {
       const { error } = await supabase
         .from("product_variants")
@@ -277,7 +408,6 @@ export default function ProductForm({
       if (error) return bail(friendly(error));
     }
 
-    // Photos
     if (removedImages.length > 0) {
       await supabase
         .from("product_images")
@@ -334,10 +464,10 @@ export default function ProductForm({
     router.refresh();
   }
 
-  const field = "rounded p-2 text-sm";
+  const field = "w-full min-w-0 rounded p-2 text-sm";
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-10">
+    <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-10">
       <section className="grid gap-4 sm:grid-cols-2">
         <h2 className="font-display text-2xl uppercase sm:col-span-2">Basic info</h2>
 
@@ -364,7 +494,7 @@ export default function ProductForm({
             }}
             className={field}
           />
-          <span className="text-xs text-muted">
+          <span className="break-all text-xs text-muted">
             /products/{slugify(slug || name) || "..."}
           </span>
         </label>
@@ -454,38 +584,155 @@ export default function ProductForm({
         </div>
       </section>
 
-      <section>
+      <section className="min-w-0">
         <h2 className="font-display text-2xl uppercase">Sizes, colours and prices</h2>
         <p className="mb-4 text-sm text-muted">
-          One row for each version you sell, for example Navy / M. Fill in an old price to show a
-          SALE badge and a crossed-out price.
+          Use Quick add to create every size and colour at once, then fine-tune any row below.
         </p>
+
+        <div className="mb-6 rounded-lg border border-line bg-surface p-4">
+          <h3 className="mb-3 text-sm font-medium uppercase tracking-wide">Quick add</h3>
+
+          <label className="mb-3 flex flex-col gap-1 text-xs text-muted">
+            What kind of sizes?
+            <select
+              value={sizePresetKey}
+              onChange={(e) => choosePreset(e.target.value)}
+              className={field}
+            >
+              {Object.entries(SIZE_PRESETS).map(([key, preset]) => (
+                <option key={key} value={key}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="mb-2 text-xs text-muted">Tap the sizes you have</p>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {sizeOptions.map((s) => (
+              <ChipButton
+                key={s}
+                label={s}
+                active={selectedSizes.includes(s)}
+                onClick={() => setSelectedSizes((prev) => toggle(prev, s))}
+              />
+            ))}
+          </div>
+          <div className="mb-5 flex gap-2">
+            <input
+              value={customSize}
+              onChange={(e) => setCustomSize(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomSize();
+                }
+              }}
+              placeholder="Other size, e.g. 3XL"
+              className={field}
+            />
+            <button
+              type="button"
+              onClick={addCustomSize}
+              className="shrink-0 rounded border border-line px-4 text-sm hover:border-accent"
+            >
+              Add
+            </button>
+          </div>
+
+          <p className="mb-2 text-xs text-muted">Tap the colours you have</p>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {colorOptions.map((c) => (
+              <ChipButton
+                key={c}
+                label={c}
+                active={selectedColors.includes(c)}
+                onClick={() => setSelectedColors((prev) => toggle(prev, c))}
+              />
+            ))}
+          </div>
+          <div className="mb-5 flex gap-2">
+            <input
+              value={customColor}
+              onChange={(e) => setCustomColor(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomColor();
+                }
+              }}
+              placeholder="Other colour, e.g. Olive"
+              className={field}
+            />
+            <button
+              type="button"
+              onClick={addCustomColor}
+              className="shrink-0 rounded border border-line px-4 text-sm hover:border-accent"
+            >
+              Add
+            </button>
+          </div>
+
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Price for all (₦)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={basePrice}
+                onChange={(e) => setBasePrice(e.target.value)}
+                className={field}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Stock for each
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={baseStock}
+                onChange={(e) => setBaseStock(e.target.value)}
+                className={field}
+              />
+            </label>
+          </div>
+
+          {genError && <p className="mb-3 text-sm text-red-400">{genError}</p>}
+
+          <button
+            type="button"
+            onClick={createOptions}
+            className="rounded bg-accent px-5 py-2 text-sm font-medium text-accent-contrast hover:bg-accent-strong"
+          >
+            Create options
+          </button>
+        </div>
 
         <div className="flex flex-col gap-3">
           {variants.map((v) => (
             <div
               key={v.key}
-              className="grid grid-cols-2 gap-3 rounded-lg border border-line bg-surface p-4 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_auto]"
+              className="grid grid-cols-2 gap-3 rounded-lg border border-line bg-surface p-4 md:grid-cols-3 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
             >
-              <label className="flex flex-col gap-1 text-xs text-muted">
+              <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
                 Size
                 <input
                   value={v.size}
                   onChange={(e) => updateVariant(v.key, "size", e.target.value)}
-                  placeholder="M, 42, 50ml"
                   className={field}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
+              <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
                 Colour
                 <input
                   value={v.color}
                   onChange={(e) => updateVariant(v.key, "color", e.target.value)}
-                  placeholder="Navy"
                   className={field}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
+              <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
                 Price (₦)
                 <input
                   type="number"
@@ -496,19 +743,19 @@ export default function ProductForm({
                   className={field}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
-                Old price (₦)
+              <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
+                Original price (₦)
                 <input
                   type="number"
                   min="0"
                   step="any"
                   value={v.compare_at_price}
                   onChange={(e) => updateVariant(v.key, "compare_at_price", e.target.value)}
-                  placeholder="optional"
+                  placeholder="only if on sale"
                   className={field}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
+              <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
                 Stock
                 <input
                   type="number"
@@ -519,23 +766,14 @@ export default function ProductForm({
                   className={field}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
-                SKU
-                <input
-                  value={v.sku}
-                  onChange={(e) => updateVariant(v.key, "sku", e.target.value)}
-                  placeholder="optional"
-                  className={field}
-                />
-              </label>
               <button
                 type="button"
                 onClick={() => removeVariant(v)}
                 aria-label="Remove option"
-                className="col-span-2 flex items-center justify-center gap-2 self-end rounded border border-line p-2 text-sm text-red-300 hover:border-red-400 md:col-span-1"
+                className="col-span-2 flex items-center justify-center gap-2 self-end rounded border border-line p-2 text-sm text-red-300 hover:border-red-400 md:col-span-3 lg:col-span-1"
               >
                 <Trash2 size={16} />
-                <span className="md:hidden">Remove</span>
+                <span className="lg:hidden">Remove</span>
               </button>
             </div>
           ))}
@@ -547,7 +785,7 @@ export default function ProductForm({
           className="mt-3 inline-flex items-center gap-2 rounded border border-accent px-4 py-2 text-sm text-accent hover:bg-accent hover:text-accent-contrast"
         >
           <Plus size={16} />
-          Add another size / colour
+          Add one row by hand
         </button>
       </section>
 
