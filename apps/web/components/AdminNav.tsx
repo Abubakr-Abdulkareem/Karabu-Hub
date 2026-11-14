@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 // Add new admin sections here as we build them
-const links = [{ href: "/admin/orders", label: "Orders" }];
+const links = [
+  { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/products", label: "Products" },
+];
 
 export default function AdminNav() {
   const pathname = usePathname();
