@@ -1,8 +1,8 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import VariantPicker, { type Variant } from "@/components/VariantPicker";
 import BackButton from "@/components/BackButton";
+import ProductGallery from "@/components/ProductGallery";
 
 type ProductDetail = {
   id: string;
@@ -62,29 +62,11 @@ export default async function ProductPage({
       <BackButton fallbackHref="/#shop" />
 
       <div className="grid gap-8 md:grid-cols-2">
-        <div className="flex flex-col gap-3">
-          {images[0] && (
-            <Image
-              src={images[0].url}
-              alt={product.name}
-              width={600}
-              height={800}
-              className="aspect-3/4 w-full rounded object-cover"
-            />
-          )}
-          {images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {images.slice(1).map((img) => (
-                <Image
-                  key={img.url}
-                  src={img.url}
-                  alt={product.name}
-                  width={200}
-                  height={260}
-                  className="aspect-3/4 w-full rounded object-cover"
-                />
-              ))}
-            </div>
+        <div className="md:sticky md:top-24 md:self-start">
+          {images.length > 0 ? (
+            <ProductGallery images={images.map((img) => img.url)} alt={product.name} />
+          ) : (
+            <div className="aspect-3/4 w-full rounded bg-surface-2" />
           )}
         </div>
 
